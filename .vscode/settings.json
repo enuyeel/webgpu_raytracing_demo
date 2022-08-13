@@ -1,0 +1,16 @@
+{
+    "editor.rulers": [
+      100
+    ],
+    "files.associations": {
+      "cstdio": "cpp",
+      "cstdlib": "cpp",
+      "memory": "cpp",
+      "__locale": "cpp",
+      "forward_list": "cpp",
+      "list": "cpp",
+      "vector": "cpp",
+      "xstring": "cpp",
+      "string": "cpp"
+    }
+}
