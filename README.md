@@ -64,6 +64,3 @@
 
 # python -m http.server -d output
 # http://localhost:8000
-
-# C:\Users\Yune\Desktop\eel94nuy\repos\webgpu_raytracing_demo
-# C:\dyune\emsdk

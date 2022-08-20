@@ -53,6 +53,7 @@ static WGPURenderPipeline fullQuadPipeline = 0;
 //static wgpu::SwapChain swapChain;
 static WGPUSwapChain swapChain = 0;
 static WGPUBindGroup computeBindGroup = 0;
+static WGPUBuffer uniformBuffer = 0;
 static WGPUBindGroup fullQuadBindGroup = 0;
 
 void GetDevice(void (*callback)(WGPUDevice)) 
@@ -126,10 +127,10 @@ void GetDevice(void (*callback)(WGPUDevice))
 //* Address spaces
 //* [https://www.w3.org/TR/WGSL/#address-space]
 //* [https://www.w3.org/TR/WGSL/#var-and-value]
-
-//* [https://www.w3.org/TR/WGSL/#var-and-value]
 //* A value declaration creates a name for a value, and that value is immutable once it has been declared.
 //* A variable declaration creates a name for memory locations for storing a value; the value stored there may be updated.
+//* [https://www.w3.org/TR/WGSL/#ref-ptr-types]
+//* in WGSL source text: Reference types must not appear.
 
 //* [https://www.shadertoy.com/view/ssGXDd]
 
@@ -170,14 +171,29 @@ static const char computeShader[] = R"(
   //   return x;
   // }
 
-  fn uhash(seed : u32) -> u32
+  //* [https://www.w3.org/TR/WGSL/#address-space]
+  //* Shared among invocations in the same compute shader workgroup
+  //var<workgroup> globalSeed : atomic<u32>;
+  //TODO : seed shared by workgroup needs its initialization & access in control?;
+  //TODO : atomic store / load, barrier?
+  //var<workgroup> globalSeed : u32;
+  //* Shared among invocations in the same shader stage
+  //@group(0) @binding(1)
+  //var<storage, read_write> globalSeed : u32;
+  var<private> globalSeed : u32;
+  
+  fn uhash() -> u32
   { 
-    var x : u32 = seed;
+    //var x : u32 = atomicLoad(&globalSeed);
+    var x : u32 = globalSeed;
     x = x ^ (x >> 16u);
     x = x * 0x7feb352du;
     x = x ^ (x >> 15u);
     x = x * 0x846ca68bu;
     x = x ^ (x >> 16u);
+    //atomicStore(&globalSeed, x);
+    globalSeed = x;
+
     return x;
   }
 
@@ -192,10 +208,9 @@ static const char computeShader[] = R"(
   //   (*rng).s1 = next;
   //   return last;
   // }
-
-  fn urandom(seed : u32) -> u32
+  fn urandom() -> u32
   {
-    return uhash(seed);
+    return uhash();
   }
 
   //* float random(inout Random rng)
@@ -203,9 +218,9 @@ static const char computeShader[] = R"(
   // { 
   //   return myUnorm(urandom(rng)); 
   // }
-  fn random(seed : u32) -> f32
+  fn random() -> f32
   {
-    return myUnorm(urandom(seed));
+    return myUnorm(urandom());
   }
 
   //* vec2 random2(inout Random rng)
@@ -213,21 +228,20 @@ static const char computeShader[] = R"(
   // { 
   //   return vec2<f32>(random(rng),random(rng)); 
   // }
-  fn random2(seed1 : u32, seed2 : u32) -> vec2<f32>
+  fn random2() -> vec2<f32>
   {
-    return vec2<f32>(random(seed1), random(seed2));
+    return vec2<f32>(random(), random());
   }
 
   // uniformly random on the surface of a sphere
   // produces normal vectors as well
   //* vec3 uniform_sphere_area (inout Random rng)
-  fn uniform_sphere_area (seed1 : u32, seed2 : u32) -> vec3<f32>
+  fn uniform_sphere_area () -> vec3<f32>
   {
-    var u : vec2<f32> = random2(seed1, seed2);
     //* Map the [0, 1] to [0, 2PI]; hence 'phi'
-    var phi : f32 = 6.28318530718 * u.x;
+    var phi : f32 = 6.28318530718 * random();
     //* Map the [0, 1] to [-1, 1]; hence 'cos(rho)'
-    var cosrho : f32 = 2.0 * u.y - 1.0;
+    var cosrho : f32 = 2.0 * random() - 1.0;
     var sinrho : f32 = sqrt(1.0 - (cosrho * cosrho));
     //* Varies depending on the coordinate system;
     return vec3<f32>(sinrho * cos(phi), cosrho, sinrho * sin(phi));
@@ -237,18 +251,23 @@ static const char computeShader[] = R"(
 
   // uniformly random within the volume of a sphere
   //* vec3 uniform_sphere_volume (inout Random rng)
-  fn uniform_sphere_volume (seed1 : u32, seed2 : u32, seed3 : u32) -> vec3<f32>
+  fn uniform_sphere_volume () -> vec3<f32>
   {
     //TODO : pow() is something like a pdf?; without it, points appear to be
     //TODO : clustered at the center of the sphere.
-    return uniform_sphere_area(seed1, seed2) * pow(random(seed3), 1.0/3.0);
+    return uniform_sphere_area() * pow(random(), 1.0/3.0);
   }
 
+  @group(0) @binding(1) var<uniform> iteration : u32;
   @group(0) @binding(0) var outputTexture : texture_storage_2d<rgba8unorm, write>;
 
-  const workgroup_size_x : u32 = 16;
-  const workgroup_size_y : u32 = 16;
-  const workgroup_size_z : u32 = 1;
+  const workgroupSizeX : u32 = 16;
+  const workgroupSizeY : u32 = 16;
+  const workgroupSizeZ : u32 = 1;
+
+  const lambert : u32    = 0;
+  const metal : u32      = 1;
+  const dielectric : u32 = 2;
 
   fn SDSphere(poi : vec3<f32>, //* point of interest
               center : vec3<f32>, 
@@ -257,115 +276,103 @@ static const char computeShader[] = R"(
     return length(poi - center) - radius;
   }
 
-  fn scene(poi : vec3<f32>) -> f32
+  struct HitRecord { 
+    d : f32, 
+    n : vec3<f32>,          //* surface normal
+    albedo : vec3<f32>,     //* object's albedo; diffuse color
+    materialType : u32,     //* object's material type
+    fuzz : f32,             //* specific to metal
+    isFrontFace : bool,     
+    indexOfRefraction : f32 //* specific to dielectric
+  };
+
+  fn sphereIntersect( 
+    ro : vec3<f32>, rd : vec3<f32>, 
+    ce : vec3<f32>, r : f32, albedo : vec3<f32>, materialType : u32, 
+    fuzz : f32, indexOfRefraction : f32, //* specific to certain types
+    tMin : f32, tMax : f32,
+    hitRecord : ptr<function, HitRecord> ) -> bool
   {
-    var sd : f32 = SDSphere(poi, vec3<f32>(0.0, 0.0, 5.0), 1.0);
-    sd = min(sd, SDSphere(poi, vec3<f32>(0.0, -30.0, 5.0), 29.0) );
+    //* (A-C); from the original equation
+    let oc : vec3<f32> = ro - ce;
+    //let a : f32 = dot( rd, rd ); //* assumes ray direction is normalized... for now
+    //b : f32 = 2.0 * dot( oc, rd );
+    let half_b : f32 = dot( oc, rd );
+    let c : f32 = dot( oc, oc ) - r * r;
+    //discriminant = b * b - 4 * a * c;
+    //discriminant = b * b - 4 * c;
+    let discriminant : f32 = half_b * half_b - c;
+    //let discriminant : f32 = half_b * half_b - a * c;
+    if ( discriminant < 0.0 ){ return false; }
+    let sd : f32 = sqrt( discriminant );
 
-    return sd;
-  }
-
-  fn rayMarch(
-    //pixelCoords : vec2<f32>
-    rayOrigin : vec3<f32>,
-    rayDir : vec3<f32>,
-    fragCoords : vec2<u32>, dim : vec2<u32>,
-    //depth : u32
-  ) -> vec3<f32>
-  {
-    const e : f32 = 0.0001;
-    const maximumDistance : f32 = 1000.0;
-    const maximumIteration : u32 = 1000;
-    //* 50% reflector : objects only absorb half the energy on each bounce
-    //TODO : different reflector for different models?
-    const reflector : f32 = 0.5;
-    var totalBounce : f32 = 1.0;
-    var totalDistance : f32 = 0.0;
-    //var hitDistance : f32 = maximumDistance;
-    var rayOriginPrime : vec3<f32> = rayOrigin;
-    var rayDirPrime : vec3<f32> = rayDir;
-
-    const depthMax : u32 = 50;
-    var depth : u32 = 0;
-
-    for(var i : u32 = 0; i < maximumIteration; i++)
+    //var root : f32 = ( -half_b - sd ) / a;
+    var root : f32 = ( -half_b - sd );
+    if ( root < tMin || root > tMax )
     {
-      if (depth >= depthMax)
-      {
-        return vec3<f32>(0.0);
-      }
+      //root = ( -half_b + sd ) / a;
+      root = ( -half_b + sd );
+      if ( root < tMin || root > tMax ){ return false; }
+    }
 
-      let rayEnd : vec3<f32> = rayOriginPrime + rayDirPrime * totalDistance;
+    (*hitRecord).d = root;
+    (*hitRecord).albedo = albedo; 
+    (*hitRecord).materialType = materialType;
+    (*hitRecord).fuzz = fuzz;
+    (*hitRecord).indexOfRefraction = indexOfRefraction;
+    
+    let outwardNormal : vec3<f32> = (ro + (root * rd) - ce) / r;
+    (*hitRecord).isFrontFace = dot( outwardNormal, rd ) <= 0.0;
+    //(*hitRecord).n = outwardNormal;
+    if ( (*hitRecord).isFrontFace ) { (*hitRecord).n = outwardNormal; }
+    else { (*hitRecord).n = -outwardNormal; }
 
-      let distance : f32 = scene(rayEnd);   
-      totalDistance += distance;
-
-      //TODO : mitigate shadow acne; ray trapped inside the objects?
-      if (distance <= e)
-      {
-        //hitDistance = totalDistance;
-
-        //* rayOrigin'(prime)
-        rayOriginPrime = rayOriginPrime + rayDirPrime * totalDistance;
-
-        //surface normal vector
-        let N : vec3<f32> = normalize(
-          vec3<f32>(scene(rayOriginPrime + vec3( e, 0., 0.)) 
-                  - scene(rayOriginPrime - vec3( e, 0., 0.)),
-                    scene(rayOriginPrime + vec3(0.,  e, 0.)) 
-                  - scene(rayOriginPrime - vec3(0.,  e, 0.)),
-                    scene(rayOriginPrime + vec3(0., 0.,  e)) 
-                  - scene(rayOriginPrime - vec3(0., 0.,  e)))
-        );
-
-        //TODO : proper name adhering to the compute shader standards
-        var temp : u32 = fragCoords.x + (fragCoords.y * dim.x);
-        //* rayDir'(prime)
-        rayDirPrime = rayOriginPrime + N + uniform_sphere_area(
-          //TODO : 1,061,683,200 (FHD Texture) reaching 4,294,967,295; 
-          //TODO : approximately 2,071.261 samples (depth)
-          temp + (dim.x * dim.y) * depth, 
-          //TODO : 2,071.261 >> 2 for convergence
-          0xffffffffu - temp, 
-        );
-        depth++;
-        rayDirPrime = normalize(rayDirPrime - rayOriginPrime);
-
-        //* Reinitialize for clean sheet
-        totalBounce *= reflector;
-        totalDistance = 0.0;
-        i = 0;
-
-        continue;
-      }
-
-      if (totalDistance >= maximumDistance)
-      {
-        //hitDistance = maximumDistance;
-        break;
-      }
-    } 
-
-    let rayDirNorm : vec3<f32> = normalize(rayDirPrime);
-    let t : f32 = 0.5 * (rayDirNorm.y + 1.0);
-    //TODO : This line replaces texture color lookup for light sources.
-    //* Linear interpolation between white, and sky blue;
-    //* straight up vector (0, 1, 0) will yield 100% sky blue color
-    let light : vec3<f32> = (1.0 - t) * vec3<f32>(1.0, 1.0, 1.0) + t * vec3<f32>(0.5, 0.7, 1.0);
-
-    return totalBounce * light;
+    return true;
   }
 
-  @compute @workgroup_size(workgroup_size_x, workgroup_size_y, workgroup_size_z)
+  fn scene(
+    ro : vec3<f32>, rd : vec3<f32>,
+    tMin : f32, tMax : f32,
+    hitType : ptr<function, HitRecord> ) -> bool
+  {
+    //var sd : f32 = SDSphere(poi, vec3<f32>(0.0, 0.0, 5.0), 1.0);
+    //sd = min(sd, SDSphere(poi, vec3<f32>(0.0, -30.0, 5.0), 29.0) );
+
+    var isHit : bool = false;
+    (*hitType).d = tMax;
+
+    //! GOAT bug... || is a short-circuit operator, so it matters whether isHit is on the left, or on the right. Simply use '|=' to get away with subtle BS.
+    isHit |= sphereIntersect(ro, rd, vec3<f32>( 0.0,    0.0, -1.0),   0.5, vec3<f32>(0.7, 0.3, 0.3), lambert, 0.0, 0.0, tMin, (*hitType).d, hitType);
+    isHit |= sphereIntersect(ro, rd, vec3<f32>( 0.0, -100.5, -1.0), 100.0, vec3<f32>(0.8, 0.8, 0.0), lambert, 0.0, 0.0, tMin, (*hitType).d, hitType);
+    //isHit |= sphereIntersect(ro, rd, vec3<f32>(-1.0,    0.0, -1.0),   0.5, vec3<f32>(0.8, 0.8, 0.8), metal, 0.3, 0.0, tMin, (*hitType).d, hitType);
+    isHit |= sphereIntersect(ro, rd, vec3<f32>(-1.0,    0.0, -1.0),  -0.5, vec3<f32>(0.0, 0.0, 0.0), dielectric, 0.0, 1.0 / 1.5, tMin, (*hitType).d, hitType);
+    isHit |= sphereIntersect(ro, rd, vec3<f32>( 1.0,    0.0, -1.0),   0.5, vec3<f32>(0.8, 0.6, 0.2), metal, 1.0, 0.0, tMin, (*hitType).d, hitType);
+
+    return isHit;
+  }
+
+  @compute @workgroup_size(workgroupSizeX, workgroupSizeY, workgroupSizeZ)
   fn main(
     @builtin(workgroup_id) workgroupIdx : vec3<u32>,
     @builtin(local_invocation_id) localInvocationIdx : vec3<u32>,
   )
-  {  
+  {
+    // workgroupBarrier();
+    // globalSeed = workgroupIdx.x * workgroupSizeX + workgroupIdx.y * workgroupSizeY;
+    // workgroupBarrier();
+
+    // storageBarrier();
+    // globalSeed = 0;
+    // storageBarrier();
+
+    //TODO : does it work as intended?
+    //* [https://stackoverflow.com/questions/10435253/glsl-infinity-constant]
+    let f32Infinity : f32 = bitcast<f32>(0x7F800000u);
+    
     let dim : vec2<i32> = textureDimensions(outputTexture);
     let fragCoords : vec2<i32> = vec2<i32>(
-      i32(workgroupIdx.x * workgroup_size_x + localInvocationIdx.x),
-      i32(workgroupIdx.y * workgroup_size_y + localInvocationIdx.y)
+      i32(workgroupIdx.x * workgroupSizeX + localInvocationIdx.x),
+      i32(workgroupIdx.y * workgroupSizeY + localInvocationIdx.y)
     );
 
     //TODO : profiling tool for branching performance?
@@ -375,19 +382,121 @@ static const char computeShader[] = R"(
     {
       return; //* much like 'discard'.
     }
-    //* Normalized pixel coordinates; 
-    //* x : [-aspect_ratio, aspect_ratio], y : [-1, 1]
-    let pixelCoords : vec2<f32> = (2.0 * vec2<f32>(fragCoords) - vec2<f32>(dim)) / f32(dim.y);
 
+    const e : f32 = 0.001;
+    //* 50% reflector : objects only absorb half the energy on each bounce
+    //TODO : different reflector for different models?
+    //const reflector : f32 = 0.5;
+    //* introduced while changing implementation detail from recursive to iterative func
+    //var totalBounce : f32 = 1.0;
+    //var totalDistance : f32 = 0.0;
+    //var hitDistance : f32 = maximumDistance;
     //* Initial ray properties; rayMarch() is recursive.
-    let rayOrigin : vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); //* camera position
-    let rayDir : vec3<f32> = normalize(vec3<f32>(pixelCoords, 1.0)); //* No need to normalize.
-    
-    let finalColor : vec3<f32> = rayMarch(rayOrigin, rayDir, 
-      vec2<u32>(fragCoords), 
-      vec2<u32>(dim));
+    let rayOrigin : vec3<f32> = vec3<f32>(0.0, 0.0, 1.0); //* camera position
+    var rayOriginPrime : vec3<f32> = rayOrigin;
 
-    textureStore(outputTexture, fragCoords, vec4<f32>(finalColor, 1.0));
+    const depthMax : u32 = 50;
+    //var depth : u32 = 0;
+    const sampleSize : u32 = 32;
+    globalSeed = u32( fragCoords.x + (fragCoords.y * dim.x) ) * iteration;
+    var attenuation : vec3<f32> = vec3<f32>(1.0);
+
+    //* pixelColor is more appropriate than fragColor?
+    var pixelColor : vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    for(var sampleIdx : u32 = 0; sampleIdx < sampleSize; sampleIdx++)
+    {
+      //* Normalized pixel coordinates; 
+      //* x : [-aspect_ratio, aspect_ratio], y : [-1, 1]
+      let pixelCoords : vec2<f32> = ( 2.0 * ( vec2<f32>(fragCoords) + vec2<f32>(random(), random()) ) - vec2<f32>(dim) ) / f32(dim.y);
+      //TODO : normalize? depends on implementation of intersection funcs, etc.
+      var rayDirPrime : vec3<f32> = normalize(vec3<f32>(pixelCoords, -1.0));
+
+      for(var i : u32 = 0; i < depthMax; i++)
+      {
+        var hitRecord : HitRecord;
+        if (scene(rayOriginPrime, rayDirPrime, e, f32Infinity, &hitRecord))
+        {
+          //* rayOrigin'(prime); scattered ray's origin
+          rayOriginPrime = rayOriginPrime + rayDirPrime * hitRecord.d;
+
+          //* rayDir'(prime); scattered direction
+          if(hitRecord.materialType == lambert)
+          {
+            rayDirPrime = normalize( hitRecord.n + uniform_sphere_area() );
+
+            //* degenerate case
+            if (abs(rayDirPrime.x) < 1e-8 &&
+                abs(rayDirPrime.y) < 1e-8 &&
+                abs(rayDirPrime.z) < 1e-8)
+            {
+              rayDirPrime = hitRecord.n;
+            }
+          }
+          else if(hitRecord.materialType == metal)
+          {
+            let reflected = rayDirPrime - 2.0 * dot( hitRecord.n, rayDirPrime ) * hitRecord.n;
+            rayDirPrime = normalize( reflected + uniform_sphere_area() * hitRecord.fuzz );
+            //TODO : 
+            if (dot(rayDirPrime, hitRecord.n) <= 0.0) { break; }
+          }
+          else //* dielectric
+          {
+            hitRecord.albedo = vec3<f32>(1.0, 1.0, 1.0); //* force white color
+
+            var indexOfRefraction = hitRecord.indexOfRefraction;
+            //* if it's the ray inside the object
+            if(!hitRecord.isFrontFace) { indexOfRefraction = 1.0 / indexOfRefraction; }
+
+            let cosTheta = dot( -rayDirPrime, hitRecord.n );
+            let sinTheta = sqrt( 1.0 - cosTheta * cosTheta );
+
+            //* No solution to the Snell's law; thus cannot reflect, and must reflect
+            if (indexOfRefraction * sinTheta > 1.0) 
+            {
+              rayDirPrime = rayDirPrime - 2.0 * dot( hitRecord.n, rayDirPrime ) * hitRecord.n;
+            }
+            else
+            {
+              //* t = t_\perp+t_\parallel 
+
+              //* t_\perp=\frac{n_1}{n_2}\left \{ i-(i\cdot n)n \right \}
+              let tPerp : vec3<f32> = indexOfRefraction * ( rayDirPrime - dot(rayDirPrime, hitRecord.n) * hitRecord.n );
+
+              //* t_\parallel=(t \cdot n)n
+              //* t_\parallel=\pm\sqrt{1-(\frac{n_1}{n_2})^2\left \{1-(i\cdot n)^2\right \}}n
+              let tPar : vec3<f32> = -sqrt( 1 - dot( tPerp, tPerp ) ) * hitRecord.n;
+
+              rayDirPrime = tPerp + tPar;
+            }
+          }
+
+          attenuation *= hitRecord.albedo;
+
+          continue;
+        }
+        else
+        {
+          let t : f32 = 0.5 * (rayDirPrime.y + 1.0);
+          //TODO : This line replaces texture color lookup for light sources.
+          //* Linear interpolation between white, and sky blue;
+          //* straight up vector (0, 1, 0) will yield 100% sky blue color
+          let light : vec3<f32> = (1.0 - t) * vec3<f32>(1.0, 1.0, 1.0) + t * vec3<f32>(0.5, 0.7, 1.0);
+
+          //pixelColor += totalBounce * light;
+          pixelColor += attenuation * light;
+          break;
+        }
+      }
+
+      //! Reinitialize for clean sheet
+      //totalBounce = 1.0;
+      attenuation = vec3<f32>(1.0);
+      rayOriginPrime = rayOrigin;
+    }
+
+    pixelColor *= 1.0 / f32(sampleSize);
+    //TODO : progressive refinement instead of multiple sampling is an option.
+    textureStore(outputTexture, fragCoords, vec4<f32>(sqrt(pixelColor), 1.0));
   }
 
 )";
@@ -532,22 +641,56 @@ void init() {
   textureViewDesc.aspect = WGPUTextureAspect_All; 
   WGPUTextureView textureView = wgpuTextureCreateView(texture, &textureViewDesc);
 
+  WGPUBufferDescriptor bufferDesc{};
+  bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform; //* The buffer can be used as the destination of a copy or write operation.
+  bufferDesc.size = 4; //* The size of the buffer in bytes.
+  bufferDesc.mappedAtCreation = false; 
+  //WGPUBuffer uniformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+  uniformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+  //wgpuBufferGetMappedRange(uniformBuffer, 0, 4);
+  //wgpuBufferUnmap(uniformBuffer);
+  //TODO : Filler; seemingly backend has problem w/ not initializing the buffer (D3D12 command allocator Reset() E_FAIL)
+  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, 0, 4); 
+
   {
     WGPUComputePipelineDescriptor computePipelineDesc{};
+
+    /*
+      @group(0) @binding(1) var<uniform> iteration : u32;
+      @group(0) @binding(0) var outputTexture : texture_storage_2d<rgba8unorm, write>;
+    */
 
     WGPUStorageTextureBindingLayout storageTextureBindingLayout{};
     storageTextureBindingLayout.access = WGPUStorageTextureAccess_WriteOnly; //* default
     storageTextureBindingLayout.format = WGPUTextureFormat_RGBA8Unorm;
     storageTextureBindingLayout.viewDimension = WGPUTextureViewDimension_2D; //* corresponding WGSL types: (...), texture_storage_2d
 
-    WGPUBindGroupLayoutEntry bindGroupLayoutEntry = {};
-    bindGroupLayoutEntry.binding = 0;
-    bindGroupLayoutEntry.visibility = WGPUShaderStage_Compute;
-    bindGroupLayoutEntry.storageTexture = storageTextureBindingLayout;
+      WGPUBufferBindingLayout bufferBindingLayout{};
+      bufferBindingLayout.type = WGPUBufferBindingType_Uniform;
+      bufferBindingLayout.hasDynamicOffset = false;
+      bufferBindingLayout.minBindingSize = 0;
+
+      // WGPUBindGroupLayoutEntry bindGroupLayoutEntry{};
+      // bindGroupLayoutEntry.binding = 0;
+      // bindGroupLayoutEntry.visibility = WGPUShaderStage_Compute;
+      // bindGroupLayoutEntry.storageTexture = storageTextureBindingLayout;
+
+      WGPUBindGroupLayoutEntry bindGroupLayoutEntries[2] = {};
+      bindGroupLayoutEntries[0].binding = 0;
+      bindGroupLayoutEntries[0].visibility = WGPUShaderStage_Compute;
+      bindGroupLayoutEntries[0].storageTexture = storageTextureBindingLayout;
+      bindGroupLayoutEntries[1].binding = 1;
+      bindGroupLayoutEntries[1].visibility = WGPUShaderStage_Compute;
+      bindGroupLayoutEntries[1].buffer = bufferBindingLayout;
 
     WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {};
-    bindGroupLayoutDesc.entryCount = 1;
-    bindGroupLayoutDesc.entries = &bindGroupLayoutEntry;
+
+      bindGroupLayoutDesc.entryCount = 2;
+      bindGroupLayoutDesc.entries = bindGroupLayoutEntries;
+
+      // bindGroupLayoutDesc.entryCount = 1;
+      // bindGroupLayoutDesc.entries = &bindGroupLayoutEntry;
+
     WGPUBindGroupLayout bindGroupLayout = {};
     bindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc);
 
@@ -568,11 +711,23 @@ void init() {
     WGPUBindGroupDescriptor bindGroupDescriptor{};
     bindGroupDescriptor.layout = bindGroupLayout;
 
-    bindGroupDescriptor.entryCount = 1;
-    WGPUBindGroupEntry bindGroupEntry;
-    bindGroupEntry.binding = 0;
-    bindGroupEntry.textureView = textureView;
-    bindGroupDescriptor.entries = &bindGroupEntry;
+      // bindGroupDescriptor.entryCount = 1;
+
+      bindGroupDescriptor.entryCount = 2;
+
+      // WGPUBindGroupEntry bindGroupEntry{};
+      // bindGroupEntry.binding = 0;
+      // bindGroupEntry.textureView = textureView;
+      // bindGroupDescriptor.entries = &bindGroupEntry;
+
+      WGPUBindGroupEntry bindGroupEntries[2];
+      bindGroupEntries[0].binding = 0;
+      bindGroupEntries[0].textureView = textureView;
+      bindGroupEntries[1].binding = 1;
+      bindGroupEntries[1].buffer = uniformBuffer;
+      bindGroupEntries[1].offset = 0;
+      bindGroupEntries[1].size = 4;
+      bindGroupDescriptor.entries = bindGroupEntries;
     
     computeBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDescriptor);
   }
@@ -747,7 +902,11 @@ void render(WGPUTextureView view) {
   //WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, 0);
   //commands = encoder.Finish();
   WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, 0);
-  
+
+  static uint32_t callCount = 1;
+  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &callCount, 4);
+  ++callCount;
+
   wgpuQueueSubmit(queue, 1, &commands);
   //queue.Submit(1, &commands);
   wgpuCommandBufferRelease(commands);
@@ -815,6 +974,8 @@ void run() {
     swapChainDesc.format = WGPUTextureFormat_BGRA8Unorm;
     swapChainDesc.width = 512;
     swapChainDesc.height = 512;
+    //swapChainDesc.width = 800;
+    //swapChainDesc.height = 600;
     //swapChainDesc.presentMode = wgpu::PresentMode::Fifo;
     swapChainDesc.presentMode = WGPUPresentMode_Fifo;
     swapChain = wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
