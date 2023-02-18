@@ -369,10 +369,10 @@ static const char computeShader[] = R"(
     //* [https://stackoverflow.com/questions/10435253/glsl-infinity-constant]
     let f32Infinity : f32 = bitcast<f32>(0x7F800000u);
     
-    let dim : vec2<i32> = textureDimensions(outputTexture);
-    let fragCoords : vec2<i32> = vec2<i32>(
-      i32(workgroupIdx.x * workgroupSizeX + localInvocationIdx.x),
-      i32(workgroupIdx.y * workgroupSizeY + localInvocationIdx.y)
+    let dim : vec2<u32> = textureDimensions(outputTexture);
+    let fragCoords : vec2<u32> = vec2<u32>(
+      workgroupIdx.x * workgroupSizeX + localInvocationIdx.x,
+      workgroupIdx.y * workgroupSizeY + localInvocationIdx.y
     );
 
     //TODO : profiling tool for branching performance?

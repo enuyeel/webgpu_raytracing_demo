@@ -59,7 +59,32 @@
 # Building with -sALLOW_MEMORY_GROWTH allows the total amount of memory used to change 
 # depending on the demands of the application.
 
-# em++ -std=c++11 -Wall -Wextra -Werror -Wno-nonportable-include-path -fno-exceptions -fno-rtti -g3 -D_DEBUG=1 -Wno-unused -Wno-unused-parameter -s ENVIRONMENT=web -s ALLOW_MEMORY_GROWTH=0 main.cpp -s USE_WEBGPU=1 -o output/index.html --shell-file shell_minimal.html
+
+# [https://emscripten.org/docs/tools_reference/emcc.html]
+#
+# -g<level>
+# "[compile+link] Controls the level of debuggability."
+
+# [https://emscripten.org/docs/tools_reference/emcc.html]
+# "Most clang options will work, as will gcc options (...) To see the full list of Clang options supported on the version of Clang used by Emscripten, run clang --help."
+# e.g.) clang --help | findstr /c:"no-rtti"
+
+# [https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#Warning-Options]
+# "Each of these specific warning options also has a negative form beginning ‘-Wno-’ to turn off warnings; (...)."
+#
+# -Wunused-parameter
+# "Warn whenever a function parameter is unused aside from its declaration. To suppress this warning use the unused attribute (see Variable Attributes)."
+
+# [https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Dialect-Options.html#C_002b_002b-Dialect-Options]
+# "(...) options that are only meaningful for C++ programs."
+#
+# -Wno-exceptions 
+# "Disable the warning about the case when an exception handler is shadowed by another handler, which can point out a wrong ordering of exception handlers."
+#
+# -fno-rtti
+# "Disable generation of information about every class with virtual functions for use by the C++ run-time type identification features (dynamic_cast and typeid). If you don’t use those parts of the language, you can save some space by using this flag."
+
+# em++ -std=c++11 -Wall -Wextra -Werror -fno-rtti -g3 -Wno-unused -Wno-unused-parameter -s ENVIRONMENT=web -s ALLOW_MEMORY_GROWTH=0 main.cpp -s USE_WEBGPU=1 -o output/index.html --shell-file shell_minimal.html
 
 # python -m http.server -d output
 # http://localhost:8000
