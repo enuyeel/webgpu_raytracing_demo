@@ -1,4 +1,4 @@
-#include <dawn/include/webgpu/webgpu.h>
+#include <webgpu/webgpu_cpp.h>
 
 #include "window.h" //window::Handle
 

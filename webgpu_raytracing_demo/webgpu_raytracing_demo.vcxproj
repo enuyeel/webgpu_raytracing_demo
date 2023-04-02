@@ -161,16 +161,24 @@ xcopy /y "$(SolutionDir)..\shader" "$(TargetDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\emscripten\wgpu.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\emscripten\window.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\src\main.cpp" />
-    <ClCompile Include="..\src\webgpu.cpp" />
-    <ClCompile Include="..\src\window.cpp" />
+    <ClCompile Include="..\src\win\wgpu.cpp" />
+    <ClCompile Include="..\src\win\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shader\compute.wgsl" />
     <None Include="..\shader\frag.wgsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\inc\webgpu.h" />
+    <ClInclude Include="..\inc\wgpu.h" />
     <ClInclude Include="..\inc\window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

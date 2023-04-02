@@ -1,4 +1,4 @@
-#include "webgpu.h"
+#include "wgpu.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -60,35 +60,6 @@ static bool initSwapChain(
   if (dSwapChainImplementation.userData != 0)
     return false;
 
-  //#ifdef __EMSCRIPTEN__
-  //
-  //  //TODO : ChainedStruct serves as an extension to the base struct?
-  //  //wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
-  //  WGPUSurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
-  //  canvasDesc.selector = "#canvas";
-  //  canvasDesc.chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
-  //
-  //  //* 'Surface' abstracts the native platform surface or window.
-  //  WGPUSurfaceDescriptor surfaceDesc{};
-  //  surfaceDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&canvasDesc);
-  //  //'instance' is 0 for Emscripten build.
-  //  WGPUSurface surface = wgpuInstanceCreateSurface(0, &surfaceDesc);
-  //
-  //  //* 'Swap Chain' will let us rotate through the images being displayed on the canvas,
-  //  //  rendering to a buffer which is not visible while another is shown (i.e., double-buffering).
-  //  WGPUSwapChainDescriptor swapChainDesc{}; //wgpu::SwapChainDescriptor scDesc{};
-  //  //* output color attachment image 
-  //  swapChainDesc.usage = WGPUTextureUsage_RenderAttachment; //swapChainDesc.usage = wgpu::TextureUsage::RenderAttachment;
-  //  swapChainDesc.format = WGPUTextureFormat_BGRA8Unorm; //swapChainDesc.format = wgpu::TextureFormat::BGRA8Unorm;
-  //  swapChainDesc.width = windowWidth;
-  //  swapChainDesc.height = windowHeight;
-  //  swapChainDesc.presentMode = WGPUPresentMode_Fifo; //swapChainDesc.presentMode = wgpu::PresentMode::Fifo;
-  //  swapChain = wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
-  //  //TODO : Set the initial dimension of the canvas to the size of the initial w, h.
-  //  emscripten_set_element_css_size("#canvas", swapChainDesc.width, swapChainDesc.height);
-  //
-  //#else
-
   switch (backendType)
   {
 
@@ -136,13 +107,6 @@ bool webgpu::createDevice(
   window::Handle handle
 )
 {
-
-//#ifdef __EMSCRIPTEN__
-//
-//  device = emscripten_webgpu_get_device();
-//
-//#else
-
   dInstance.DiscoverDefaultAdapters();
   std::vector<dawn::native::Adapter> adapters = dInstance.GetAdapters();
   wgpu::AdapterProperties properties;
@@ -182,8 +146,6 @@ bool webgpu::createDevice(
   procs.deviceSetUncapturedErrorCallback(device,
     [](WGPUErrorType errorType, const char* message, void*) { printf("%d: %s\n", errorType, message); }, 0);
   dawnProcSetProcs(&procs);
-
-//#endif
 
   return true;
 }

@@ -11,16 +11,8 @@
 //* Intersection
 //* [https://iquilezles.org/articles/intersectors/]
 
-//#ifdef __EMSCRIPTEN__
-//#include <emscripten.h>
-//#include <emscripten/html5.h>
-//#include <emscripten/html5_webgpu.h>
-//#include <webgpu/webgpu.h>
-
-#include <Windows.h>
-
 #include "window.h"
-#include "webgpu.h"
+#include "wgpu.h"
 
 #include <fstream> //ifstream
 #include <vector>
@@ -424,7 +416,9 @@ static void render() {
   //queue.Submit(1, &commands);
   wgpuCommandBufferRelease(commands);
 
+#ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(swapChain);
+#endif
 
   wgpuTextureViewRelease(backBuffer);
 }
@@ -444,10 +438,6 @@ int main(int, char* []) {
 
   if (!initPipeline())
     return -1;
-
-#ifdef __EMSCRIPTEN__
-  emscripten_set_main_loop(render, 0, false);
-#endif
 
   window::show(hwnd);
   window::loop(render);

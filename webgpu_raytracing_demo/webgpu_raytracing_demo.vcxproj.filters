@@ -19,16 +19,28 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="src\win">
+      <UniqueIdentifier>{5b4147a7-5ca0-4d94-b0e6-d761739e4023}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\emscripten">
+      <UniqueIdentifier>{a9e99b55-b745-4568-a118-39d2156c1965}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\window.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\webgpu.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\main.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win\window.cpp">
+      <Filter>src\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\emscripten\window.cpp">
+      <Filter>src\emscripten</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win\wgpu.cpp">
+      <Filter>src\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\emscripten\wgpu.cpp">
+      <Filter>src\emscripten</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -43,7 +55,7 @@
     <ClInclude Include="..\inc\window.h">
       <Filter>inc</Filter>
     </ClInclude>
-    <ClInclude Include="..\inc\webgpu.h">
+    <ClInclude Include="..\inc\wgpu.h">
       <Filter>inc</Filter>
     </ClInclude>
   </ItemGroup>
