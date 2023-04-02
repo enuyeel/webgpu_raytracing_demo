@@ -836,6 +836,7 @@ typedef struct WGPUDawnTextureInternalUsageDescriptor {
     WGPUTextureUsageFlags internalUsage;
 } WGPUDawnTextureInternalUsageDescriptor;
 
+// Can be chained in WGPUInstanceDescriptor
 // Can be chained in WGPUDeviceDescriptor
 typedef struct WGPUDawnTogglesDescriptor {
     WGPUChainedStruct chain;
@@ -912,6 +913,7 @@ typedef struct WGPULimits {
     uint32_t maxComputeWorkgroupSizeY;
     uint32_t maxComputeWorkgroupSizeZ;
     uint32_t maxComputeWorkgroupsPerDimension;
+    uint32_t maxFragmentCombinedOutputResources;
 } WGPULimits;
 
 typedef struct WGPUMultisampleState {
@@ -1241,6 +1243,7 @@ typedef struct WGPUImageCopyExternalTexture {
     WGPUChainedStruct const * nextInChain;
     WGPUExternalTexture externalTexture;
     WGPUOrigin3D origin;
+    WGPUExtent2D naturalSize;
 } WGPUImageCopyExternalTexture;
 
 typedef struct WGPUImageCopyTexture {
@@ -1393,6 +1396,7 @@ typedef WGPUProc (*WGPUProcGetProcAddress)(WGPUDevice device, char const * procN
 // Procs of Adapter
 typedef WGPUDevice (*WGPUProcAdapterCreateDevice)(WGPUAdapter adapter, WGPUDeviceDescriptor const * descriptor /* nullable */);
 typedef size_t (*WGPUProcAdapterEnumerateFeatures)(WGPUAdapter adapter, WGPUFeatureName * features);
+typedef WGPUInstance (*WGPUProcAdapterGetInstance)(WGPUAdapter adapter);
 typedef bool (*WGPUProcAdapterGetLimits)(WGPUAdapter adapter, WGPUSupportedLimits * limits);
 typedef void (*WGPUProcAdapterGetProperties)(WGPUAdapter adapter, WGPUAdapterProperties * properties);
 typedef bool (*WGPUProcAdapterHasFeature)(WGPUAdapter adapter, WGPUFeatureName feature);
@@ -1513,12 +1517,15 @@ typedef void (*WGPUProcDeviceRelease)(WGPUDevice device);
 
 // Procs of ExternalTexture
 typedef void (*WGPUProcExternalTextureDestroy)(WGPUExternalTexture externalTexture);
+typedef void (*WGPUProcExternalTextureExpire)(WGPUExternalTexture externalTexture);
+typedef void (*WGPUProcExternalTextureRefresh)(WGPUExternalTexture externalTexture);
 typedef void (*WGPUProcExternalTextureSetLabel)(WGPUExternalTexture externalTexture, char const * label);
 typedef void (*WGPUProcExternalTextureReference)(WGPUExternalTexture externalTexture);
 typedef void (*WGPUProcExternalTextureRelease)(WGPUExternalTexture externalTexture);
 
 // Procs of Instance
 typedef WGPUSurface (*WGPUProcInstanceCreateSurface)(WGPUInstance instance, WGPUSurfaceDescriptor const * descriptor);
+typedef void (*WGPUProcInstanceProcessEvents)(WGPUInstance instance);
 typedef void (*WGPUProcInstanceRequestAdapter)(WGPUInstance instance, WGPURequestAdapterOptions const * options /* nullable */, WGPURequestAdapterCallback callback, void * userdata);
 typedef void (*WGPUProcInstanceReference)(WGPUInstance instance);
 typedef void (*WGPUProcInstanceRelease)(WGPUInstance instance);
@@ -1652,6 +1659,7 @@ WGPU_EXPORT WGPUProc wgpuGetProcAddress(WGPUDevice device, char const * procName
 // Methods of Adapter
 WGPU_EXPORT WGPUDevice wgpuAdapterCreateDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const * descriptor /* nullable */);
 WGPU_EXPORT size_t wgpuAdapterEnumerateFeatures(WGPUAdapter adapter, WGPUFeatureName * features);
+WGPU_EXPORT WGPUInstance wgpuAdapterGetInstance(WGPUAdapter adapter);
 WGPU_EXPORT bool wgpuAdapterGetLimits(WGPUAdapter adapter, WGPUSupportedLimits * limits);
 WGPU_EXPORT void wgpuAdapterGetProperties(WGPUAdapter adapter, WGPUAdapterProperties * properties);
 WGPU_EXPORT bool wgpuAdapterHasFeature(WGPUAdapter adapter, WGPUFeatureName feature);
@@ -1772,12 +1780,15 @@ WGPU_EXPORT void wgpuDeviceRelease(WGPUDevice device);
 
 // Methods of ExternalTexture
 WGPU_EXPORT void wgpuExternalTextureDestroy(WGPUExternalTexture externalTexture);
+WGPU_EXPORT void wgpuExternalTextureExpire(WGPUExternalTexture externalTexture);
+WGPU_EXPORT void wgpuExternalTextureRefresh(WGPUExternalTexture externalTexture);
 WGPU_EXPORT void wgpuExternalTextureSetLabel(WGPUExternalTexture externalTexture, char const * label);
 WGPU_EXPORT void wgpuExternalTextureReference(WGPUExternalTexture externalTexture);
 WGPU_EXPORT void wgpuExternalTextureRelease(WGPUExternalTexture externalTexture);
 
 // Methods of Instance
 WGPU_EXPORT WGPUSurface wgpuInstanceCreateSurface(WGPUInstance instance, WGPUSurfaceDescriptor const * descriptor);
+WGPU_EXPORT void wgpuInstanceProcessEvents(WGPUInstance instance);
 WGPU_EXPORT void wgpuInstanceRequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const * options /* nullable */, WGPURequestAdapterCallback callback, void * userdata);
 WGPU_EXPORT void wgpuInstanceReference(WGPUInstance instance);
 WGPU_EXPORT void wgpuInstanceRelease(WGPUInstance instance);

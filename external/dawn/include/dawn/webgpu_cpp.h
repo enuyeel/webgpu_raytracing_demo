@@ -770,6 +770,7 @@ namespace wgpu {
 
         Device CreateDevice(DeviceDescriptor const * descriptor = nullptr) const;
         size_t EnumerateFeatures(FeatureName * features) const;
+        Instance GetInstance() const;
         bool GetLimits(SupportedLimits * limits) const;
         void GetProperties(AdapterProperties * properties) const;
         bool HasFeature(FeatureName feature) const;
@@ -962,6 +963,8 @@ namespace wgpu {
         using ObjectBase::operator=;
 
         void Destroy() const;
+        void Expire() const;
+        void Refresh() const;
         void SetLabel(char const * label) const;
 
       private:
@@ -976,6 +979,7 @@ namespace wgpu {
         using ObjectBase::operator=;
 
         Surface CreateSurface(SurfaceDescriptor const * descriptor) const;
+        void ProcessEvents() const;
         void RequestAdapter(RequestAdapterOptions const * options, RequestAdapterCallback callback, void * userdata) const;
 
       private:
@@ -1382,6 +1386,7 @@ namespace wgpu {
         alignas(kFirstMemberAlignment) TextureUsage internalUsage = TextureUsage::None;
     };
 
+    // Can be chained in InstanceDescriptor
     // Can be chained in DeviceDescriptor
     struct DawnTogglesDescriptor : ChainedStruct {
         DawnTogglesDescriptor() {
@@ -1469,6 +1474,7 @@ namespace wgpu {
         uint32_t maxComputeWorkgroupSizeY = WGPU_LIMIT_U32_UNDEFINED;
         uint32_t maxComputeWorkgroupSizeZ = WGPU_LIMIT_U32_UNDEFINED;
         uint32_t maxComputeWorkgroupsPerDimension = WGPU_LIMIT_U32_UNDEFINED;
+        uint32_t maxFragmentCombinedOutputResources = WGPU_LIMIT_U32_UNDEFINED;
     };
 
     struct MultisampleState {
@@ -1547,7 +1553,7 @@ namespace wgpu {
         TextureView view;
         LoadOp depthLoadOp = LoadOp::Undefined;
         StoreOp depthStoreOp = StoreOp::Undefined;
-        float depthClearValue = 0;
+        float depthClearValue = NAN;
         bool depthReadOnly = false;
         LoadOp stencilLoadOp = LoadOp::Undefined;
         StoreOp stencilStoreOp = StoreOp::Undefined;
@@ -1797,8 +1803,8 @@ namespace wgpu {
     struct DepthStencilState {
         ChainedStruct const * nextInChain = nullptr;
         TextureFormat format;
-        bool depthWriteEnabled = false;
-        CompareFunction depthCompare = CompareFunction::Always;
+        bool depthWriteEnabled;
+        CompareFunction depthCompare;
         StencilFaceState stencilFront;
         StencilFaceState stencilBack;
         uint32_t stencilReadMask = 0xFFFFFFFF;
@@ -1834,6 +1840,7 @@ namespace wgpu {
         ChainedStruct const * nextInChain = nullptr;
         ExternalTexture externalTexture;
         Origin3D origin;
+        Extent2D naturalSize;
     };
 
     struct ImageCopyTexture {

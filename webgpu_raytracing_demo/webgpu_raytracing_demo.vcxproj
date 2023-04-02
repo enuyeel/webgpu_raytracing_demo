@@ -79,12 +79,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)..\external;$(SolutionDir)..\external\dawn\include;$(VULKAN_SDK)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\external;$(SolutionDir)..\inc;$(SolutionDir)..\external\dawn\include;$(VULKAN_SDK)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)..\external;$(SolutionDir)..\external\dawn\include;$(VULKAN_SDK)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\external;$(SolutionDir)..\inc;$(SolutionDir)..\external\dawn\include;$(VULKAN_SDK)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -126,7 +126,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_proc.dll.lib;$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_native.dll.lib;$(SolutionDir)..\external\SDL2-2.26.2\lib\$(PlatformShortName)\SDL2main.lib;$(SolutionDir)..\external\SDL2-2.26.2\lib\$(PlatformShortName)\SDL2.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_proc.dll.lib;$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_native.dll.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(SolutionDir)..\external\dawn\lib\x64\Debug\dawn_proc.dll" "$(TargetDir)"
@@ -144,13 +144,14 @@ xcopy /y "$(SolutionDir)..\shader" "$(TargetDir)"</Command>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_proc.dll.lib;$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_native.dll.lib;$(SolutionDir)..\external\SDL2-2.26.2\lib\$(PlatformShortName)\SDL2main.lib;$(SolutionDir)..\external\SDL2-2.26.2\lib\$(PlatformShortName)\SDL2.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_proc.dll.lib;$(SolutionDir)..\external\dawn\lib\$(PlatformShortName)\$(Configuration)\dawn_native.dll.lib;$(VULKAN_SDK)\Lib\vulkan-1.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(SolutionDir)..\external\dawn\lib\x64\Debug\dawn_proc.dll" "$(TargetDir)"
@@ -160,11 +161,17 @@ xcopy /y "$(SolutionDir)..\shader" "$(TargetDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\webgpu.cpp" />
+    <ClCompile Include="..\src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shader\compute.wgsl" />
     <None Include="..\shader\frag.wgsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\inc\webgpu.h" />
+    <ClInclude Include="..\inc\window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -11,6 +11,7 @@ typedef struct DawnProcTable {
 
     WGPUProcAdapterCreateDevice adapterCreateDevice;
     WGPUProcAdapterEnumerateFeatures adapterEnumerateFeatures;
+    WGPUProcAdapterGetInstance adapterGetInstance;
     WGPUProcAdapterGetLimits adapterGetLimits;
     WGPUProcAdapterGetProperties adapterGetProperties;
     WGPUProcAdapterHasFeature adapterHasFeature;
@@ -122,11 +123,14 @@ typedef struct DawnProcTable {
     WGPUProcDeviceRelease deviceRelease;
 
     WGPUProcExternalTextureDestroy externalTextureDestroy;
+    WGPUProcExternalTextureExpire externalTextureExpire;
+    WGPUProcExternalTextureRefresh externalTextureRefresh;
     WGPUProcExternalTextureSetLabel externalTextureSetLabel;
     WGPUProcExternalTextureReference externalTextureReference;
     WGPUProcExternalTextureRelease externalTextureRelease;
 
     WGPUProcInstanceCreateSurface instanceCreateSurface;
+    WGPUProcInstanceProcessEvents instanceProcessEvents;
     WGPUProcInstanceRequestAdapter instanceRequestAdapter;
     WGPUProcInstanceReference instanceReference;
     WGPUProcInstanceRelease instanceRelease;
