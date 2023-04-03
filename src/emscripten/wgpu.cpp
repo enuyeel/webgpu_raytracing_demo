@@ -1,22 +1,125 @@
 #include "wgpu.h"
 
-#include <emscripten/html5_webgpu.h> //emscripten_webgpu_get_device()
+//#include <emscripten/html5_webgpu.h> //emscripten_webgpu_get_device()
 #include <emscripten/html5.h>        //emscripten_set_element_css_size()
+#include <cstdio>                    //printf
+#include <cassert>                   //assert
 
 static WGPUSwapChain swapChain = 0;
+static WGPUDevice    device = 0;
 
 bool webgpu::createDevice(WGPUBackendType type0, WGPUBackendType type1, window::Handle handle)
 {
+  // Left as null (until supported in Emscripten)
+  //static const WGPUInstance instance = nullptr;
+
+  wgpuInstanceRequestAdapter(0, 0, 
+    [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata)
+    {
+      printf("a\n");
+
+      if (message) {
+        printf("wgpuInstanceRequestAdapter: %s\n", message);
+      }
+
+      printf("b\n");
+
+      if (status == WGPURequestAdapterStatus_Unavailable)
+      {
+        printf("WebGPU unavailable; exiting cleanly\n");
+        // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
+        exit(0);
+      }
+
+      printf("c\n");
+
+      assert(status == WGPURequestAdapterStatus_Success);
+
+      printf("d\n");
+
+      wgpuAdapterRequestDevice(adapter, nullptr, 
+        [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata)
+        {
+
+          printf("e\n");
+
+          if (message) {
+            printf("wgpuAdapterRequestDevice: %s\n", message);
+          }
+
+          printf("f\n");
+
+          assert(status == WGPURequestDeviceStatus_Success);
+
+          printf("g\n");
+
+          printf("%p\n", device);
+
+          device = dev;
+
+          printf("%p\n", device);
+
+          printf("h\n");
+
+          //wgpu::Device device = wgpu::Device::Acquire(dev);
+          //reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
+        }, 0);
+
+    }, 0);
+
+  //device = emscripten_webgpu_get_device();
+
+  wgpuDeviceSetUncapturedErrorCallback(device,
+    [](WGPUErrorType errorType, const char* message, void*) { printf("%d: %s\n", errorType, message); }, 0);
+
   return true;
 }
 
+//[https://zenn.dev/kd_gamegikenblg/articles/a5a8effe43bf3c]
+//[https://github.com/kainino0x/webgpu-cross-platform-demo/blob/main/main.cpp]
 WGPUDevice webgpu::getDevice()
 {
-  return emscripten_webgpu_get_device();
+  //// Left as null (until supported in Emscripten)
+  ////static const WGPUInstance instance = nullptr;
+
+  //wgpuInstanceRequestAdapter(0, 0, 
+  //  [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata)
+  //  {
+  //    if (message) {
+  //      printf("wgpuInstanceRequestAdapter: %s\n", message);
+  //    }
+
+  //    if (status == WGPURequestAdapterStatus_Unavailable)
+  //    {
+  //      printf("WebGPU unavailable; exiting cleanly\n");
+  //      // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
+  //      exit(0);
+  //    }
+  //    assert(status == WGPURequestAdapterStatus_Success);
+
+  //    wgpuAdapterRequestDevice(adapter, nullptr, 
+  //      [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata)
+  //      {
+  //        if (message) {
+  //          printf("wgpuAdapterRequestDevice: %s\n", message);
+  //        }
+  //        assert(status == WGPURequestDeviceStatus_Success);
+
+  //        device = dev;
+
+  //        //wgpu::Device device = wgpu::Device::Acquire(dev);
+  //        //reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
+  //      }, 0);
+
+  //  }, 0);
+
+  return device;
 }
 
 WGPUSwapChain webgpu::createSwapChain()
 {
+  if (swapChain) return swapChain;
+
   //TODO : ChainedStruct serves as an extension to the base struct?
   //wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
   WGPUSurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
@@ -38,7 +141,7 @@ WGPUSwapChain webgpu::createSwapChain()
   swapChainDesc.width = 512;
   swapChainDesc.height = 512;
   swapChainDesc.presentMode = WGPUPresentMode_Fifo; //swapChainDesc.presentMode = wgpu::PresentMode::Fifo;
-  WGPUSwapChain swapChain = wgpuDeviceCreateSwapChain(emscripten_webgpu_get_device(), surface, &swapChainDesc);
+  swapChain = wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
 
   //TODO : Set the initial dimension of the canvas to the size of the initial w, h.
   emscripten_set_element_css_size("#canvas", swapChainDesc.width, swapChainDesc.height);
