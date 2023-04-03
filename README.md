@@ -2,7 +2,7 @@
 
 ![](512x512.png "")
 
-A simple raytracing demo built with Dawn WebGPU C/C++ headers for Windows and Web. It's basically Peter Shirley's ["Ray Tracing in One Weekend"](https://raytracing.github.io/) series, and is written in WGSL compute shader.
+A simple raytracing demo built with Dawn WebGPU C/C++ headers for Windows and Web. It's following Peter Shirley's ["Ray Tracing in One Weekend"](https://raytracing.github.io/) series, and is written (mostly) in WGSL compute shader.
 
 [**Run it on your browser! Latest Chrome Canary is required with '#enable-unsafe-webgpu' flag enabled.**](https://yuneismyname.com/demos/raytracing/)
 
