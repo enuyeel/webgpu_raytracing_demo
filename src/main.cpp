@@ -432,33 +432,21 @@ int main(int, char* []) {
 #ifndef __EMSCRIPTEN__
 
   window::Handle hwnd = window::create();
-  printf("create()\n");
   if (!hwnd) return -1;
-
-  //wgpu::Device dev = wgpu::Device::Acquire(device);
-  //wgpu::Queue q = dev.GetQueue();
-  //wgpu::s
 
   if (!webgpu::createDevice(WGPUBackendType_D3D12, WGPUBackendType_Null, hwnd))
     return -1;
-  printf("createDevice()\n");
 
   device = webgpu::getDevice();
-  printf("getDevice()\n");
 
   //* A 'Queue' allows you to send works asynchronously to the GPU.
   queue = wgpuDeviceGetQueue(device);
-  printf("wgpuDeviceGetQueue()\n");
 
   swapChain = webgpu::createSwapChain();
-  printf("createSwapChain()\n");
 
-  if (!initPipeline())
-    return -1;
-  printf("initPipeline()\n");
+  if (!initPipeline()) return -1;
 
   window::show(hwnd);
-  printf("show()\n");
 
   window::loop(render);
 

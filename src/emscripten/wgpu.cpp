@@ -16,13 +16,9 @@ bool webgpu::createDevice(WGPUBackendType type0, WGPUBackendType type1, window::
   wgpuInstanceRequestAdapter(0, 0, 
     [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata)
     {
-      printf("a\n");
-
       if (message) {
         printf("wgpuInstanceRequestAdapter: %s\n", message);
       }
-
-      printf("b\n");
 
       if (status == WGPURequestAdapterStatus_Unavailable)
       {
@@ -30,36 +26,17 @@ bool webgpu::createDevice(WGPUBackendType type0, WGPUBackendType type1, window::
         // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
         exit(0);
       }
-
-      printf("c\n");
-
       assert(status == WGPURequestAdapterStatus_Success);
-
-      printf("d\n");
 
       wgpuAdapterRequestDevice(adapter, nullptr, 
         [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata)
         {
-
-          printf("e\n");
-
           if (message) {
             printf("wgpuAdapterRequestDevice: %s\n", message);
           }
-
-          printf("f\n");
-
           assert(status == WGPURequestDeviceStatus_Success);
 
-          printf("g\n");
-
-          printf("%p\n", device);
-
           device = dev;
-
-          printf("%p\n", device);
-
-          printf("h\n");
 
           //wgpu::Device device = wgpu::Device::Acquire(dev);
           //reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
